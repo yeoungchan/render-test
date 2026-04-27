@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스와이프몰 통합 연동 시뮬레이션 - 최종본(주문결제 정상화)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ────────────────────────────────────
+           공통 및 헤더 스타일
+        ──────────────────────────────────── */
+        body { font-family: 'Noto Sans KR', sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; color: #333; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 50px; background: #fff; border-bottom: 2px solid #0097a7; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .logo { font-size: 24px; font-weight: 700; cursor: pointer; color: #0097a7; }
+        .admin-btn { background-color: #343a40; color: #fff; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        
+        /* ────────────────────────────────────
+           쇼핑몰 뷰 컨테이너
+        ──────────────────────────────────── */
+        .view-section { display: none; padding: 40px 50px; max-width: 1200px; margin: 20px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); min-height: 500px; }
+        .view-section.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 상품 목록 (메인) */
+        .product-grid { display: flex; gap: 20px; flex-wrap: wrap; justify-content: flex-start; margin-top: 20px; }
+        .product-card { width: 260px; text-align: center; border: 1px solid #eee; border-radius: 8px; padding-bottom: 15px; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+        .product-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-color: #0097a7; }
+        .product-card img { width: 100%; height: 220px; object-fit: cover; margin-bottom: 15px; }
+        .product-title { font-weight: 700; font-size: 16px; margin-bottom: 5px; }
+        .product-price { font-weight: 700; color: #e53935; font-size: 15px; }
+        .product-branch-badge { font-size: 11px; background: #f0f0f0; padding: 2px 8px; border-radius: 12px; color: #666; margin-bottom: 8px; display: inline-block; }
+
+        /* ────────────────────────────────────
+           상품 상세 - 상단 영역
+        ──────────────────────────────────── */
+        .detail-top { display: flex; gap: 40px; margin-bottom: 40px; }
+        .detail-img-box { flex: 1; border: 1px solid #eee; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #fafafa; }
+        .detail-img-box img { width: 100%; max-height: 500px; object-fit: contain; }
+        .detail-info-box { flex: 1; display: flex; flex-direction: column; }
+        .detail-title-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .detail-title { font-size: 24px; font-weight: 700; margin: 0; color: #222; }
+        
+        .info-row { display: flex; margin-bottom: 12px; font-size: 14px; }
+        .info-row .label { width: 100px; color: #666; }
+        .info-row .value { font-weight: 600; color: #333; }
+        
+        .qty-box { background: #f8f9fa; border: 1px solid #eee; padding: 15px 20px; border-radius: 4px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .qty-name { font-size: 13px; color: #555; }
+        .qty-controls { display: flex; border: 1px solid #ddd; border-radius: 2px; overflow: hidden; background: #fff; }
+        .qty-controls button { width: 30px; height: 30px; background: none; border: none; font-size: 16px; cursor: pointer; color: #666; }
+        .qty-controls button:hover { background: #f0f0f0; }
+        .qty-controls input { width: 40px; height: 30px; border: none; border-left: 1px solid #ddd; border-right: 1px solid #ddd; text-align: center; font-size: 14px; outline: none; }
+        .qty-subtotal { font-weight: 700; font-size: 15px; }
+        
+        .total-price-row { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; margin-top: 20px; padding-top: 20px; margin-bottom: 25px; }
+        .total-price-row .label { font-size: 14px; font-weight: 600; color: #333; }
+        .total-price-row .total-value { font-size: 26px; font-weight: 700; color: #17a2b8; }
+        
+        .action-btns { display: flex; gap: 10px; }
+        .action-btns button { flex: 1; padding: 15px 0; font-size: 16px; font-weight: 700; border-radius: 2px; cursor: pointer; transition: 0.2s; }
+        .btn-cart { background: #fff; border: 1px solid #222; color: #222; }
+        .btn-cart:hover { background: #f9f9f9; }
+        .btn-buy { background: #17a2b8; border: 1px solid #17a2b8; color: #fff; }
+        .btn-buy:hover { background: #138496; }
+
+        /* ────────────────────────────────────
+           상품 상세 - 하단 탭 영역
+        ──────────────────────────────────── */
+        .tab-bar { display: flex; border: 1px solid #ddd; border-bottom: 2px solid #2c3a47; margin-bottom: 30px; }
+        .tab-btn { flex: 1; padding: 14px; text-align: center; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: #fff; color: #888; border-right: 1px solid #ddd; transition: all 0.2s; }
+        .tab-btn:last-child { border-right: none; }
+        .tab-btn.active { background: #2c3a47; color: #fff; font-weight: 700; border-color: #2c3a47; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        
+        .section-title { font-size: 16px; font-weight: 700; color: #111; padding-bottom: 10px; border-bottom: 2px solid #222; margin-bottom: 15px; margin-top: 10px; }
+        .info-table, .seller-table { width: 100%; border-collapse: collapse; border: 1px solid #e0e0e0; margin-bottom: 20px; }
+        .info-table tr, .seller-table tr { border-bottom: 1px solid #e8e8e8; }
+        .info-table th, .seller-table th { width: 150px; padding: 13px 18px; background: #f9f9f9; font-weight: 600; font-size: 13px; color: #444; text-align: left; border-right: 1px solid #e8e8e8; vertical-align: top; }
+        .info-table td, .seller-table td { padding: 13px 20px; font-size: 13px; color: #333; line-height: 1.6; vertical-align: top; }
+        .highlight { font-weight: 700; color: #111 !important; font-size: 14px !important; }
+        .disclaimer-box { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 4px; padding: 15px; font-size: 12px; color: #666; line-height: 1.6; }
+
+        /* ────────────────────────────────────
+           ★ 주문/결제 화면 스타일 (새로 복구됨) ★
+        ──────────────────────────────────── */
+        .checkout-title { text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 30px; color: #222; padding-bottom: 20px; border-bottom: 1px solid #222; }
+        .checkout-section-title { font-size: 18px; font-weight: 700; color: #111; padding-bottom: 10px; border-bottom: 1px solid #222; margin-bottom: 20px; margin-top: 40px; }
+        
+        .checkout-item-row { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #eee; }
+        .checkout-item-left { display: flex; align-items: center; gap: 20px; }
+        .checkout-item-left img { width: 80px; height: 80px; object-fit: cover; border: 1px solid #eee; border-radius: 4px; }
+        .checkout-item-info { display: flex; flex-direction: column; gap: 5px; }
+        .checkout-item-name { font-weight: 700; font-size: 16px; }
+        .checkout-item-code { font-size: 13px; color: #888; line-height: 1.6; }
+        .checkout-item-right { display: flex; align-items: center; gap: 40px; font-size: 14px; }
+        .checkout-item-price { color: #17a2b8; font-weight: 700; font-size: 16px; }
+
+        .form-row { margin-bottom: 20px; }
+        .form-label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+        .form-input-group { display: flex; align-items: center; gap: 10px; }
+        .form-input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; outline: none; }
+        .form-input:focus { border-color: #17a2b8; }
+        .form-radio-group { display: flex; align-items: center; gap: 15px; font-size: 14px; }
+        .form-radio-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .form-textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; height: 80px; resize: none; font-size: 14px; font-family: inherit; }
+
+        .summary-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 14px; color: #555; }
+        .summary-total-row { display: flex; justify-content: space-between; padding: 15px 0; font-size: 16px; font-weight: bold; border-top: 1px solid #eee; margin-top: 10px; align-items: center; }
+        .summary-total-price { color: #17a2b8; font-size: 22px; }
+
+        .payment-tabs { display: flex; gap: 10px; margin-top: 20px; }
+        .payment-tab { padding: 12px 30px; border: 1px solid #2c3a47; border-radius: 4px; background: #fff; color: #2c3a47; font-weight: bold; cursor: pointer; }
+        .payment-tab.active { background: #2c3a47; color: #fff; }
+
+        .consent-box { background: #f8f9fa; padding: 20px; border-radius: 4px; margin-top: 40px; font-size: 12px; color: #666; line-height: 1.6; }
+        .consent-box h4 { margin: 0 0 10px 0; font-size: 13px; color: #333; }
+
+        /* 하단 푸터 */
+        footer { background: #f8f9fa; border-top: 1px solid #e0e0e0; padding: 40px 50px; margin-top: 50px; font-size: 13px; color: #666; line-height: 1.8; }
+        .footer-links { display: flex; gap: 20px; font-weight: 600; margin-bottom: 20px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
+        .footer-logo { font-size: 16px; font-weight: 700; color: #888; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+
+        /* ────────────────────────────────────
+           관리자 전산 스타일
+        ──────────────────────────────────── */
+        .login-box { width: 320px; margin: 80px auto; padding: 40px; border: 1px solid #ddd; text-align: center; border-radius: 8px; background: #fff; }
+        .login-box input { width: 100%; padding: 12px; margin-bottom: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .admin-header-bar { background: #343a40; color: white; padding: 15px 20px; font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; margin-bottom: 20px; }
+        .admin-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+        .admin-table th, .admin-table td { border: 1px solid #e0e0e0; padding: 10px 8px; vertical-align: middle; }
+        .admin-table th { background-color: #f8f9fa; border-top: 2px solid #ccc; font-weight: 600; }
+        .admin-table input, .admin-table select { width: 90%; padding: 6px; border: 1px solid #ccc; border-radius: 3px; font-family: inherit; }
+        .thumb-img { width: 50px; height: 50px; object-fit: cover; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 5px; }
+        .upload-btn { background-color: #e7e7e7; color: black; border: 1px solid #ccc; font-size: 12px; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-top:3px; }
+        .upload-input { display: none; }
+        
+        .btn { padding: 8px 16px; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" onclick="switchMainView('mall-list')">Swipepay Mall</div>
+        <div class="admin-btn" onclick="switchMainView('admin-login')">⚙️ 전산 연동 관리자</div>
+    </header>
+
+    <div id="mall-list" class="view-section active">
+        <h2 style="border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0;">전체 판매 상품</h2>
+        <div class="product-grid" id="mall-product-list"></div>
+    </div>
+
+    <div id="mall-detail" class="view-section" style="max-width: 960px;">
+        <div class="detail-top">
+            <div class="detail-img-box">
+                <img id="top-main-img" src="">
+            </div>
+            <div class="detail-info-box">
+                <div class="detail-title-row">
+                    <h1 class="detail-title" id="top-title">상품명</h1>
+                    <button class="btn" style="background:#f1f1f1; color:#333; font-size:12px;" onclick="switchMainView('mall-list')">← 목록으로</button>
+                </div>
+                
+                <div class="info-row">
+                    <div class="label">가격</div>
+                    <div class="value" id="top-price-unit">0 원</div>
+                </div>
+                <div class="info-row">
+                    <div class="label">배송비</div>
+                    <div class="value">3,000 원</div>
+                </div>
+
+                <div class="qty-box">
+                    <div class="qty-name" id="qty-echo-name">상품명</div>
+                    <div style="display:flex; align-items:center; gap:20px;">
+                        <div class="qty-controls">
+                            <button onclick="changeQty(-1)">-</button>
+                            <input type="text" id="buy-qty" value="1" readonly>
+                            <button onclick="changeQty(1)">+</button>
+                        </div>
+                        <div class="qty-subtotal" id="qty-subtotal">0 원</div>
+                    </div>
+                </div>
+
+                <div class="total-price-row">
+                    <div class="label">총 상품금액</div>
+                    <div class="total-value" id="top-total-price">0 원</div>
+                </div>
+
+                <div class="action-btns">
+                    <button class="btn-cart" onclick="actionCart()">장바구니</button>
+                    <button class="btn-buy" onclick="actionBuy()">구매하기</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('detail', this)">상품 상세 정보</button>
+            <button class="tab-btn" onclick="switchTab('delivery', this)">배송/교환/반품</button>
+            <button class="tab-btn" onclick="switchTab('seller', this)">판매자 정보</button>
+        </div>
+
+        <div id="tab-detail" class="tab-panel active">
+            <div style="text-align:center; padding: 20px 0;">
+                <img id="detail-tab-img" src="" style="max-width:100%; display:block; margin:0 auto;">
+            </div>
+        </div>
+
+        <div id="tab-delivery" class="tab-panel">
+            <div class="section-title">배송/교환/반품 안내</div>
+            <table class="info-table">
+                <tr><th>배송 안내</th><td>배송 방법 : 택배<br>배송 지역 : 전국<br>배송 비용 : 3,000원<br>배송 기간 : 결제 완료 후 1일 ~ 3일</td></tr>
+                <tr><th>교환/반품 안내</th><td>상품 수령 후 7일 이내 고객센터를 통해 신청 가능합니다.<br>단순 변심으로 인한 반품 시 왕복 배송비는 고객 부담입니다.</td></tr>
+            </table>
+        </div>
+
+        <div id="tab-seller" class="tab-panel">
+            <div class="section-title">판매자 정보</div>
+            <table class="seller-table" style="margin-top:0; border-top:none;">
+                <tr><th>사업자명</th><td class="highlight" id="seller-bizname"></td></tr>
+                <tr><th>대표자</th><td id="seller-ceo"></td></tr>
+                <tr><th>사업자번호</th><td id="seller-bizno"></td></tr>
+                <tr><th>연락처</th><td id="seller-tel"></td></tr>
+                <tr><th>이메일</th><td id="seller-email"></td></tr>
+                <tr><th>사업장 주소</th><td id="seller-addr"></td></tr>
+                <tr><th>반품/교환 주소</th><td id="seller-return-addr"></td></tr>
+                <tr><th>스와이프페이 본사<br>고객센터 운영시간</th><td id="seller-cs-time"></td></tr>
+            </table>
+            <div class="disclaimer-box">
+                ※ <strong>㈜스와이프페이</strong>는 통신판매중개자로서 자유로운 거래를 위한 시스템만을 제공하며, 상품의 등록 및 판매, 배송, CS에 관한 모든 의무와 책임은 위 <strong>판매자(가맹점)</strong>에게 있습니다.
+            </div>
+        </div>
+    </div>
+
+    <div id="mall-checkout" class="view-section" style="max-width: 960px;">
+        <h1 class="checkout-title">주문/결제</h1>
+
+        <div id="checkout-item-container"></div>
+
+        <div class="checkout-section-title">배송지 정보</div>
+        
+        <div class="form-row">
+            <label class="form-label">이름</label>
+            <div class="form-input-group">
+                <input type="text" class="form-input" style="width: 250px;">
+                <div class="form-radio-group" style="margin-left: 10px;">
+                    <label><input type="radio" name="addr_type" checked> 주문자 정보와 동일</label>
+                    <label><input type="radio" name="addr_type"> 신규 배송지</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">휴대폰 번호</label>
+            <div class="form-input-group">
+                <select class="form-input" style="width: 80px;">
+                    <option>010</option>
+                    <option>011</option>
+                </select>
+                <span>-</span>
+                <input type="text" class="form-input" style="width: 100px;">
+                <span>-</span>
+                <input type="text" class="form-input" style="width: 100px;">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">수령 방법</label>
+            <div class="form-radio-group">
+                <label><input type="radio" name="receive_type" checked> 매장 수령</label>
+                <label><input type="radio" name="receive_type"> 택배 수령</label>
+                <label><input type="radio" name="receive_type"> 기타 수령</label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">요청사항 및 메모</label>
+            <textarea class="form-textarea" placeholder="20자 이내로 작성해주세요."></textarea>
+        </div>
+
+        <div class="checkout-section-title">결제정보 입력</div>
+        
+        <div class="summary-row">
+            <span>상품금액</span>
+            <span id="checkout-product-price">0 원</span>
+        </div>
+        <div class="summary-row">
+            <span>배송비</span>
+            <span id="checkout-shipping-price">0 원</span>
+        </div>
+        <div class="summary-total-row">
+            <span>총 결제 금액 <span class="summary-total-price" id="checkout-total-price">0 원</span></span>
+        </div>
+
+        <div class="payment-tabs">
+            <button class="payment-tab active">수기결제</button>
+            <button class="payment-tab">일반결제</button>
+        </div>
+
+        <div class="consent-box">
+            <h4>주문 정보 제공에 대한 동의</h4>
+            <p>
+                개인 정보를 제공받는 자 : 주문/배송 부서 담당자<br>
+                개인 정보를 제공받는 자의 개인 정보 이용 목적 : 주문 상품의 배송, 고객 상담 및 불만처리<br>
+                제공하는 개인 정보의 항목 : 성명, 주소, 연락처
+            </p>
+        </div>
+    </div>
+
+    <div id="admin-login" class="view-section">
+        <div class="login-box">
+            <h2 style="margin-top:0;">전산 시스템 접속</h2>
+            <p style="font-size: 12px; color: #666; margin-bottom:20px;">ID: admin / PW: 1234</p>
+            <input type="text" id="admin-id" placeholder="아이디">
+            <input type="password" id="admin-pw" placeholder="비밀번호" onkeypress="if(event.keyCode==13) doLogin();">
+            <button class="btn" style="width:100%; background:#0097a7; color:white; padding:12px; margin-top:10px;" onclick="doLogin()">로그인</button>
+        </div>
+    </div>
+
+    <div id="admin-dashboard" class="view-section" style="max-width: 1400px;">
+        <div class="admin-header-bar">
+            <span>스와이프페이 전산 - 상품 및 지사 연동 관리</span>
+            <button class="btn" style="background: #dc3545; color: white;" onclick="logout()">로그아웃</button>
+        </div>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th width="5%">No</th>
+                    <th width="15%">상품명</th>
+                    <th width="10%">판매가격</th>
+                    <th width="8%">대표이미지</th>
+                    <th width="8%">상세이미지</th> 
+                    <th width="15%">판매지사 (판매자정보)</th>
+                    <th width="10%">판매여부</th>
+                    <th width="15%">등록일</th>
+                    <th width="8%">관리</th>
+                </tr>
+            </thead>
+            <tbody id="admin-tbody"></tbody>
+        </table>
+        <div style="margin-top: 15px;">
+            <button class="btn" style="background:#e9ecef; color:#333;" onclick="addNewRow()">✚ 신규 상품 추가</button>
+        </div>
+        <div style="text-align: right; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+            <button class="btn" style="background:#0097a7; color:white; padding:12px 30px; font-size:16px;" onclick="syncToServer()">서버 저장 및 몰 연동 동기화 ✔</button>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-links">
+            <span>이용약관</span>
+            <span>개인정보취급방침</span>
+            <span>이용안내</span>
+        </div>
+        <div class="footer-logo">
+            <span style="color:#a8b4be;">●</span><span style="color:#d1d5db;">●</span><span style="color:#e5e7eb;">●</span> swipepay 비즈니스 상품을 준비하기 위한 스와이프 플랫폼 서비스
+        </div>
+        회사명 : (주)스와이프페이 | 대표자 : 전규남<br>
+        주소 : 서울 구로구 디지털로31길 53 이엔씨벤처드림타워 5차 709호<br>
+        사업자 등록번호 : 215-87-54259<br>
+        메일 : knjeon@gmail.com<br>
+        구매/환불/취소 문의 : 010-9002-0506<br>
+        COPYRIGHT 2023 SWIPE PLATFORM SERVICE. ALL RIGHT RESERVED.
+    </footer>
+
+    <script>
+        // 전역 상태 변수
+        let currentUnitPrice = 0;
+        let currentQty = 1;
+        let currentProductId = null; // 결제 화면 연동을 위한 상품 ID 저장용
+
+        // ★ 내용 변경 반영 ★
+        const branchDB = {
+            "main": { name: "㈜스와이프페이", ceo: "전규남", bizNo: "215-87-54259", tel: "1666-6315 / 010-0000-0000", email: "info@swipepay.co.kr", addr: "서울특별시 구로구 디지털로 31길 53, 이엔씨벤처 드림타워 5차 709호", returnAddr: "서울특별시 구로구 디지털로 31길 53, 이엔씨벤처 드림타워 5차 709호", csTime: "평일 10 : 00 ~ 18 : 00 (공휴일 휴무)" },
+            "branch_A": { name: "KSNET 총판 대리점", ceo: "김대리", bizNo: "111-22-33333", tel: "02-1234-5678", email: "contact@ksnet-agency.co.kr", addr: "서울특별시 강남구 테헤란로 123", returnAddr: "서울특별시 강남구 테헤란로 123 2층 물류창고", csTime: "평일 10 : 00 ~ 18 : 00 (공휴일 휴무)" },
+            "branch_B": { name: "제주 특산물 지사", ceo: "이해녀", bizNo: "999-88-77777", tel: "064-777-8888", email: "jeju_fresh@gmail.com", addr: "제주특별자치도 제주시 첨단로 242", returnAddr: "제주특별자치도 제주시 첨단로 242 물류센터", csTime: "평일 10 : 00 ~ 18 : 00 (공휴일 휴무)" }
+        };
+
+        let productDB = [
+            { id: 101, name: "결제단말기 TP50", price: 200000, img: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=400&fit=crop", detailImg: "https://via.placeholder.com/800x1200/eeeeee/999999?text=Product+Detail+Brochure+1", isSelling: "true", branchId: "main", date: "2026-03-10 09:30:15" },
+            { id: 102, name: "KSNET 연동 POS기", price: 850000, img: "https://images.unsplash.com/photo-1556740758-90de374c12ad?w=400&h=400&fit=crop", detailImg: "https://via.placeholder.com/800x1200/eeeeee/999999?text=Product+Detail+Brochure+2", isSelling: "true", branchId: "branch_A", date: "2026-03-12 14:20:00" },
+            { id: 103, name: "제주 방어(대)", price: 85000, img: "https://images.unsplash.com/photo-1534604973900-c4335533cb21?w=400&h=400&fit=crop", detailImg: "https://via.placeholder.com/800x1200/eeeeee/999999?text=Product+Detail+Brochure+3", isSelling: "true", branchId: "branch_B", date: "2026-04-15 11:05:45" }
+        ];
+
+        window.onload = function() { renderMallList(); renderAdminTable(); };
+
+        function switchMainView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            window.scrollTo(0,0);
+        }
+
+        function switchTab(tabId, btnEl) {
+            document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            btnEl.classList.add('active');
+        }
+
+        function renderMallList() {
+            let html = "";
+            productDB.forEach(p => {
+                if(p.isSelling === "true") {
+                    let branchName = branchDB[p.branchId].name;
+                    html += `
+                        <div class="product-card" onclick="openProductDetail(${p.id})">
+                            <img src="${p.img}">
+                            <div class="product-branch-badge">${branchName}</div>
+                            <div class="product-title">${p.name}</div>
+                            <div class="product-price">${Number(p.price).toLocaleString()}원</div>
+                        </div>
+                    `;
+                }
+            });
+            document.getElementById('mall-product-list').innerHTML = html;
+        }
+
+        function openProductDetail(productId) {
+            currentProductId = productId; 
+            let product = productDB.find(p => p.id === productId);
+            let seller = branchDB[product.branchId];
+
+            currentUnitPrice = Number(product.price);
+            currentQty = 1; 
+            
+            document.getElementById('top-main-img').src = product.img;
+            document.getElementById('top-title').innerText = product.name;
+            document.getElementById('qty-echo-name').innerText = product.name; 
+            
+            document.getElementById('detail-tab-img').src = product.detailImg || '';
+            document.getElementById('detail-tab-img').style.display = product.detailImg ? 'block' : 'none';
+            
+            updatePriceDisplay(); 
+
+            document.getElementById('seller-bizname').innerText = seller.name;
+            document.getElementById('seller-ceo').innerText = seller.ceo;
+            document.getElementById('seller-bizno').innerText = seller.bizNo;
+            document.getElementById('seller-tel').innerText = seller.tel;
+            document.getElementById('seller-email').innerText = seller.email;
+            document.getElementById('seller-addr').innerText = seller.addr;
+            document.getElementById('seller-return-addr').innerText = seller.returnAddr;
+            document.getElementById('seller-cs-time').innerHTML = seller.csTime;
+
+            switchMainView('mall-detail');
+            document.querySelector('.tab-btn').click(); 
+        }
+
+        function changeQty(delta) {
+            currentQty += delta;
+            if(currentQty < 1) currentQty = 1; 
+            updatePriceDisplay();
+        }
+
+        function updatePriceDisplay() {
+            let totalPrice = currentUnitPrice * currentQty;
+            let formattedUnit = currentUnitPrice.toLocaleString() + " 원";
+            let formattedTotal = totalPrice.toLocaleString() + " 원";
+
+            document.getElementById('buy-qty').value = currentQty;
+            document.getElementById('top-price-unit').innerText = formattedUnit;
+            document.getElementById('qty-subtotal').innerText = formattedTotal;
+            document.getElementById('top-total-price').innerText = formattedTotal;
+        }
+
+        function actionCart() { alert("장바구니에 " + currentQty + "개 담겼습니다."); }
+
+        function actionBuy() { 
+            renderCheckoutPage();
+            switchMainView('mall-checkout');
+        }
+
+        function renderCheckoutPage() {
+            let product = productDB.find(p => p.id === currentProductId);
+            let productCode = "25091000" + product.id; 
+            
+            let html = `
+                <div class="checkout-item-row">
+                    <div class="checkout-item-left">
+                        <img src="${product.img}">
+                        <div class="checkout-item-info">
+                            <div class="checkout-item-name">${product.name}</div>
+                            <div class="checkout-item-code">상품번호 : ${productCode}<br>상품가격 : ${currentUnitPrice.toLocaleString()} 원</div>
+                        </div>
+                    </div>
+                    <div class="checkout-item-right">
+                        <span>${currentQty}개</span>
+                        <span class="checkout-item-price">${(currentUnitPrice * currentQty).toLocaleString()} 원</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('checkout-item-container').innerHTML = html;
+
+            let totalProductPrice = currentUnitPrice * currentQty;
+            let shippingFee = 0; 
+            let finalTotal = totalProductPrice + shippingFee;
+
+            document.getElementById('checkout-product-price').innerText = totalProductPrice.toLocaleString() + " 원";
+            document.getElementById('checkout-shipping-price').innerText = shippingFee.toLocaleString() + " 원";
+            document.getElementById('checkout-total-price').innerText = finalTotal.toLocaleString() + " 원";
+        }
+
+        function doLogin() {
+            if(document.getElementById('admin-id').value === 'admin' && document.getElementById('admin-pw').value === '1234') {
+                switchMainView('admin-dashboard');
+                document.getElementById('admin-pw').value = ''; 
+            } else {
+                alert("계정 정보가 일치하지 않습니다.");
+            }
+        }
+
+        function logout() {
+            if(confirm("로그아웃 하시겠습니까?")) {
+                switchMainView('mall-list');
+            }
+        }
+
+        function renderAdminTable() {
+            let html = "";
+            productDB.forEach((p, idx) => {
+                let branchOptions = Object.keys(branchDB).map(key => 
+                    `<option value="${key}" ${p.branchId === key ? 'selected' : ''}>${branchDB[key].name}</option>`
+                ).join('');
+
+                html += `
+                    <tr>
+                        <td style="color:#666;">${idx + 1}</td>
+                        <td><input type="text" class="edit-name" value="${p.name}"></td>
+                        <td><input type="number" class="edit-price" value="${p.price}"></td>
+                        
+                        <td>
+                            <img src="${p.img}" class="thumb-img" id="img-preview-main-${p.id}">
+                            <br>
+                            <button class="upload-btn" onclick="uploadImage('main', ${p.id})">이미지 수정</button>
+                            <input type="file" id="upload-input-main-${p.id}" class="upload-input" accept=".png,.jpg,.jpeg" onchange="previewImage(this, 'main', ${p.id})">
+                        </td>
+                        
+                        <td>
+                            <img src="${p.detailImg}" class="thumb-img" id="img-preview-detail-${p.id}">
+                            <br>
+                            <button class="upload-btn" onclick="uploadImage('detail', ${p.id})">이미지 수정</button>
+                            <input type="file" id="upload-input-detail-${p.id}" class="upload-input" accept=".png,.jpg,.jpeg" onchange="previewImage(this, 'detail', ${p.id})">
+                        </td>
+                        
+                        <td><select class="edit-branch">${branchOptions}</select></td>
+                        <td>
+                             <select class="edit-selling">
+                                <option value="true" ${p.isSelling === 'true' ? 'selected' : ''}>true</option>
+                                <option value="false" ${p.isSelling === 'false' ? 'selected' : ''}>false</option>
+                            </select>
+                        </td>
+                        <td style="color:#666; font-size:12px;">${p.date}</td>
+                        <td><button class="btn" style="background:#e74c3c; color:white; padding:4px 10px; font-size:12px;" onclick="deleteItem(${idx})">삭제</button></td>
+                    </tr>
+                `;
+            });
+            document.getElementById('admin-tbody').innerHTML = html;
+        }
+
+        function uploadImage(type, productId) {
+            document.getElementById('upload-input-' + type + '-' + productId).click();
+        }
+
+        function previewImage(input, type, productId) {
+            if (input.files && input.files[0]) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('img-preview-' + type + '-' + productId).src = e.target.result;
+                    let product = productDB.find(p => p.id === productId);
+                    if(product) {
+                        if (type === 'main') product.img = e.target.result;
+                        else if (type === 'detail') product.detailImg = e.target.result;
+                    }
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function addNewRow() {
+            let newId = Date.now();
+            let now = new Date();
+            let dateStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0') + " " + String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0');
+
+            productDB.push({
+                id: newId, 
+                name: "신규 등록 상품", 
+                price: 0, 
+                img: "https://via.placeholder.com/400/eeeeee/999999?text=Main+Image", 
+                detailImg: "https://via.placeholder.com/800x1200/eeeeee/999999?text=Detail+Brochure",
+                isSelling: "true",
+                branchId: "main",
+                date: dateStr
+            });
+            renderAdminTable();
+        }
+
+        function deleteItem(index) {
+            if(confirm("이 상품을 삭제하시겠습니까?")) {
+                productDB.splice(index, 1);
+                renderAdminTable();
+            }
+        }
+
+        function syncToServer() {
+            let names = document.getElementsByClassName('edit-name');
+            let prices = document.getElementsByClassName('edit-price');
+            let branches = document.getElementsByClassName('edit-branch');
+            let sellings = document.getElementsByClassName('edit-selling');
+            
+            for(let i=0; i<productDB.length; i++) {
+                productDB[i].name = names[i].value;
+                productDB[i].price = prices[i].value;
+                productDB[i].branchId = branches[i].value;
+                productDB[i].isSelling = sellings[i].value;
+            }
+
+            alert("✅ 전산 데이터가 저장되었으며, 스와이프몰에 즉시 연동되었습니다.");
+            renderMallList(); 
+            switchMainView('mall-list'); 
+        }
+    </script>
+</body>
+</html>
