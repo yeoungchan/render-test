@@ -5,10 +5,13 @@ const mysql = require("mysql2");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 정적 파일 연결: index.html, 이미지, css 등 기존 사이트 유지
+app.use(express.static(__dirname));
+
 // MySQL 연결
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
+  port: Number(process.env.DB_PORT),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
@@ -19,30 +22,23 @@ const db = mysql.createConnection({
 
 db.connect((err) => {
   if (err) {
-    console.error("MySQL 연결 실패:", err);
+    console.error("MySQL 연결 실패:", err.message);
     return;
   }
-
   console.log("MySQL 연결 성공!");
 });
 
-app.use(express.static(__dirname));
-
+// 기존 쇼핑몰 바로가기 페이지
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-app.get("/mall", (req, res) => {
-  res.sendFile(path.join(__dirname, "mall.html"));
-});
-
-// 테스트 API
+// DB 테스트용 주소
 app.get("/shops", (req, res) => {
   db.query("SHOW TABLES", (err, results) => {
     if (err) {
-      return res.status(500).json(err);
+      return res.status(500).json({ error: err.message });
     }
-
     res.json(results);
   });
 });
