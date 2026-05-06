@@ -1,8 +1,11 @@
 {
- "name":"render-test",
- "version":"1.0.0",
- "main":"app.js",
- "scripts":{
-   "start":"node app.js"
+ "name": "render-test",
+ "version": "1.0.0",
+ "main": "app.js",
+ "scripts": {
+  "start": "node app.js"
+ },
+ "dependencies": {
+  "mysql2": "^3.22.3"
  }
 }
