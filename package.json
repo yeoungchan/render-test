@@ -1,11 +1,12 @@
 {
- "name": "render-test",
- "version": "1.0.0",
- "main": "app.js",
- "scripts": {
-  "start": "node app.js"
- },
- "dependencies": {
-  "mysql2": "^3.22.3"
- }
+  "name": "render-test",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "mysql2": "^3.14.1"
+  }
 }
