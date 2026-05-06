@@ -495,15 +495,49 @@
             document.getElementById('checkout-shipping-price').innerText = shippingFee.toLocaleString() + " 원";
             document.getElementById('checkout-total-price').innerText = finalTotal.toLocaleString() + " 원";
         }
+async function doLogin() {
 
-        function doLogin() {
-            if(document.getElementById('admin-id').value === 'admin' && document.getElementById('admin-pw').value === '1234') {
-                switchMainView('admin-dashboard');
-                document.getElementById('admin-pw').value = ''; 
-            } else {
-                alert("계정 정보가 일치하지 않습니다.");
-            }
+    const user_id = document.getElementById('admin-id').value;
+    const password = document.getElementById('admin-pw').value;
+
+    try {
+
+        const response = await fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id,
+                password
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+
+            alert(data.message);
+
+            switchMainView('admin-dashboard');
+
+            document.getElementById('admin-pw').value = '';
+
+        } else {
+
+            alert(data.message);
+
         }
+
+    } catch (err) {
+
+        console.error(err);
+
+        alert('서버 연결 실패');
+
+    }
+}
+     
 
         function logout() {
             if(confirm("로그아웃 하시겠습니까?")) {
