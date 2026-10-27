@@ -1,0 +1,8 @@
+export function validateBackup(raw){
+ const obj=x=>x&&typeof x==='object'&&!Array.isArray(x);const str=(x,max=10000)=>typeof x==='string'&&x.length<=max;const id=x=>str(x,200)&&!['__proto__','constructor','prototype'].includes(x);const date=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x);const list=(x,fn)=>Array.isArray(x)&&x.length<=10000&&x.every(fn);
+ if(!obj(raw)||!list(raw.events,e=>obj(e)&&id(e.id)&&str(e.title,200)&&date(e.date)&&typeof e.time==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(e.time)&&(e.note===undefined||str(e.note,2000)))||!list(raw.tasks,t=>obj(t)&&id(t.id)&&str(t.title,300)&&['높음','보통','낮음'].includes(t.priority)&&typeof t.done==='boolean')||!obj(raw.settings)||!str(raw.brief||'',2000000))throw Error('지원하지 않는 백업 형식입니다.');
+ const routines=raw.routines||[];if(!list(routines,t=>obj(t)&&id(t.id)&&str(t.title,200)&&str(t.note||'',1000)&&date(t.startDate)))throw Error('상시 업무 데이터가 올바르지 않습니다.');
+ const checks=raw.routineChecks||{};if(!obj(checks)||!Object.entries(checks).every(([d,v])=>date(d)&&obj(v)&&Object.entries(v).every(([k,b])=>id(k)&&typeof b==='boolean')))throw Error('체크 기록이 올바르지 않습니다.');
+ const settings={};for(const k of ['userName','focus','style']){if(raw.settings[k]!==undefined){if(!str(raw.settings[k],1000))throw Error('설정 형식 오류');settings[k]=raw.settings[k]}}
+ return {events:raw.events.map(e=>({id:e.id,title:e.title,date:e.date,time:e.time,note:e.note||''})),tasks:raw.tasks.map(t=>({id:t.id,title:t.title,priority:t.priority,done:t.done})),settings,brief:raw.brief||'',saved:typeof raw.saved==='string'?raw.saved:'',routines:routines.map(t=>({id:t.id,title:t.title,note:t.note||'',startDate:t.startDate})),routineChecks:checks};
+}
