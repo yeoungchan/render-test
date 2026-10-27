@@ -13,7 +13,8 @@ const password=process.env.ADMIN_PASSWORD||'';
 const secret=process.env.SESSION_SECRET||(!production?randomBytes(32).toString('hex'):'');
 if(enabled&&((!existingUsers&&(!email||password.length<12))||secret.length<32))throw Error('Set ADMIN_EMAIL, ADMIN_PASSWORD (12+ chars), SESSION_SECRET (32+ chars).');
 if(production&&!enabled)throw Error('DATABASE_URL is required for production cloud storage.');
-const store=enabled?await createStore(databaseUrl,existingUsers?null:email):null;
+let store=null,storeLoading=null,retryAfter=0;
+async function ensureStore(){if(store)return store;if(storeLoading)return storeLoading;if(Date.now()<retryAfter)return null;storeLoading=createStore(databaseUrl,existingUsers?null:email).then(value=>{store=value;return value}).catch(error=>{retryAfter=Date.now()+30000;console.error('MySQL connection unavailable:',error.code||'connection_error');return null}).finally(()=>{storeLoading=null});return storeLoading;}
 const passwordHash=scryptSync(password,secret,64);const attempts=new Map();
 function sign(value){return createHmac('sha256',secret).update(value).digest('base64url')}
 function session(req){const token=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('morning_session='))?.slice(16);if(!token)return false;const [data,sig]=token.split('.');if(!data||!sig||sig.length!==sign(data).length||!timingSafeEqual(Buffer.from(sig),Buffer.from(sign(data))))return false;try{const v=JSON.parse(Buffer.from(data,'base64url'));return typeof v.email==='string'&&(existingUsers||v.email===email)&&v.exp>Date.now()?v.email:false}catch{return false}}
@@ -26,12 +27,14 @@ export const server=http.createServer(async(req,res)=>{res.setHeader('X-Content-
  if(path.startsWith('/api/')){
  if(!enabled)return json(res,200,{enabled:false});
  if(!['GET','HEAD'].includes(req.method)){const origin=req.headers.origin;const expected=production?process.env.APP_ORIGIN:'http://'+req.headers.host;if(!expected||origin!==expected)return json(res,403,{error:'잘못된 요청 출처입니다.'});if(!req.headers['content-type']?.startsWith('application/json'))return json(res,415,{error:'JSON 요청이 필요합니다.'})}
- if(path==='/api/session'&&req.method==='GET')return json(res,200,{enabled:true,authenticated:!!session(req),email:session(req)||undefined,loginMode:existingUsers?'existing':'admin'});
+ if(path==='/api/session'&&req.method==='GET')return json(res,200,{enabled:true,databaseReady:!!(await ensureStore()),authenticated:!!session(req),email:session(req)||undefined,loginMode:existingUsers?'existing':'admin'});
  if(path==='/api/login'&&req.method==='POST'){
+ if(!await ensureStore())return json(res,503,{error:'MySQL 서버에 연결할 수 없습니다. 관리자에게 DB 연결 설정 확인을 요청하세요.'});
  const ip=req.socket.remoteAddress||'unknown';const now=Date.now();for(const [key,v]of attempts){if(v.until<now)attempts.delete(key)}const a=attempts.get(ip)||{count:0,until:now+900000};if(a.count>=10)return json(res,429,{error:'로그인 시도가 많습니다. 15분 후 다시 시도하세요.'});a.count++;attempts.set(ip,a);
  const v=await body(req);const correct=!existingUsers&&typeof v.password==='string'&&v.password.length<=512&&timingSafeEqual(scryptSync(v.password,secret,64),passwordHash);const loginOwner=existingUsers?await store.authenticate(v.email,v.password):(correct&&typeof v.email==='string'&&v.email.trim().toLowerCase()===email?email:null);if(!loginOwner)return json(res,401,{error:'이메일 또는 비밀번호를 확인하세요.'});attempts.delete(ip);const data=Buffer.from(JSON.stringify({email:loginOwner,exp:now+604800000})).toString('base64url');return json(res,200,{ok:true},{'Set-Cookie':cookie(data+'.'+sign(data))})}
  if(path==='/api/logout'&&req.method==='POST')return json(res,200,{ok:true},{'Set-Cookie':cookie('',0)});
  if(!session(req))return json(res,401,{error:'로그인이 필요합니다.'});
+ if(path==='/api/state'&&!await ensureStore())return json(res,503,{error:'MySQL 연결을 확인할 수 없습니다. 이 기기의 변경 사항을 백업하세요.'});
  if(path==='/api/state'&&req.method==='GET'){return json(res,200,await store.read(session(req)))}
  if(path==='/api/state'&&req.method==='PUT'){const v=await body(req);if(!Number.isInteger(v.revision)||v.revision<0)return json(res,400,{error:'저장 데이터 형식 오류'});try{v.state=validateBackup(v.state)}catch{return json(res,400,{error:'저장 데이터 형식 오류'})}const saved=await store.save(v.state,v.revision,session(req));if(!saved)return json(res,409,{error:'다른 기기에서 수정했습니다. 현재 기록을 백업한 뒤 서버 기록을 다시 불러오세요.'});return json(res,200,saved)}
  return json(res,404,{error:'없는 API입니다.'});}
