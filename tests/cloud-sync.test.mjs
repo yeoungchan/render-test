@@ -1,0 +1,7 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const html=fs.readFileSync('dist/index.html','utf8'),state={events:[],tasks:[],routines:[],routineChecks:{},settings:{},brief:'old',saved:''},remote={payload:{...state,brief:'server'},revision:3};const mem=new Map(),nodes=new Map();let prompts=0;const ctx=vm.createContext({state,cloud:{},key:'test',localStorage:{getItem:k=>mem.get(k)||null,setItem:(k,v)=>mem.set(k,v)},$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id)},validateBackup:v=>v,requestCloud:async()=>remote,window:{confirm:()=>{prompts++;return false}},notify:()=>{},hasRecords:()=>true,displayCloud:v=>{ctx.state=v;mem.set('test',JSON.stringify(v))}});
+vm.runInContext(html.slice(html.indexOf('const syncMetaKey='),html.indexOf('function queueCloudSave')),ctx);vm.runInContext(html.slice(html.indexOf('async function loadCloud('),html.indexOf("$('recoverLocal').hidden=!localStorage")),ctx);
+await ctx.loadCloud();assert.equal(prompts,0);assert.equal(ctx.state.brief,'server');assert.equal(JSON.parse(mem.get('test-before-server')).brief,'old');
+remote.payload={...remote.payload,brief:'new server'};await ctx.loadCloud();assert.equal(prompts,0);assert.equal(ctx.state.brief,'new server');
+ctx.state={...ctx.state,brief:'unsaved'};await ctx.loadCloud();assert.equal(prompts,1);assert.equal(ctx.state.brief,'unsaved');
+console.log('PASS legacy backup, silent server refresh, unsaved edits preserved on cancel');
