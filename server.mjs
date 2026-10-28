@@ -45,7 +45,7 @@ export const server=http.createServer(async(req,res)=>{res.setHeader('X-Content-
  if(path==='/api/naver/messages'&&req.method==='GET')return json(res,200,{...await withNaver(credentials,listNaver),fetchedAt:new Date().toISOString()});
  if(path==='/api/naver/message'&&req.method==='GET')return json(res,200,await withNaver(credentials,c=>readNaver(c,Number(url.searchParams.get('uid')),url.searchParams.get('validity'))));
  return json(res,404,{error:'없는 메일 API입니다.'});
- }catch(error){const safe=safeMailError(error);return json(res,safe.status,{error:safe.message})}finally{mailBusy.delete(owner)}}
+ }catch(error){const safe=safeMailError(error);console.warn('Naver mail failure:',safe.diagnosticCode,'attempts:',Number(error.authAttempts)||0);return json(res,safe.status,{error:safe.message,code:safe.diagnosticCode})}finally{mailBusy.delete(owner)}}
  if(path==='/api/state'&&!await ensureStore())return json(res,503,{error:'MySQL 연결을 확인할 수 없습니다. 이 기기의 변경 사항을 백업하세요.'});
  if(path==='/api/state'&&req.method==='GET'){return json(res,200,await store.read(session(req)))}
  if(path==='/api/state'&&req.method==='PUT'){const v=await body(req);if(!Number.isInteger(v.revision)||v.revision<0)return json(res,400,{error:'저장 데이터 형식 오류'});try{v.state=validateBackup(v.state)}catch{return json(res,400,{error:'저장 데이터 형식 오류'})}const saved=await store.save(v.state,v.revision,session(req));if(!saved)return json(res,409,{error:'다른 기기에서 수정했습니다. 현재 기록을 백업한 뒤 서버 기록을 다시 불러오세요.'});return json(res,200,saved)}

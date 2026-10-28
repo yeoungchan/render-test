@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';import {normalizeConnection,withNaver,safeMailError} from '../naver-mail.mjs';
+assert.equal(normalizeConnection('test@naver.com',' abcd efgh\u200bijkl\nmnop ').password,'abcdefghijklmnop');assert.throws(()=>normalizeConnection('test@naver.com',' \u200b '));
+let users=[],closed=0;class Fallback{constructor(o){users.push(o.auth.user)}on(){}async connect(){if(users.length===1)throw Object.assign(Error('provider failure'),{authenticationFailed:true})}async getMailboxLock(){return {release(){}}}close(){closed++}}
+assert.equal(await withNaver({email:'test@naver.com',password:'not-real'},()=>true,{Client:Fallback}),true);assert.deepEqual(users,['test@naver.com','test']);assert.equal(closed,2);
+let attempts=0;class NetworkFailure extends Fallback{async connect(){attempts++;throw Object.assign(Error('network'),{code:'ETIMEDOUT'})}}
+await assert.rejects(withNaver({email:'test@naver.com',password:'not-real'},()=>true,{Client:NetworkFailure}));assert.equal(attempts,1);
+assert.equal(safeMailError({authenticationFailed:true,response:'IP blocked'}).diagnosticCode,'NAVER_ACCESS_POLICY');assert.equal(safeMailError({authenticationFailed:true,response:'a private provider error'}).diagnosticCode,'NAVER_AUTH_REJECTED');assert(!safeMailError({authenticationFailed:true,response:'a private provider error'}).message.includes('private'));console.log('PASS app-password formatting, bounded username fallback, no retry on network errors, safe failure classification');
