@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "check": "node --check server.mjs",
-    "test": "node tests/mysql-store.test.mjs && node tests/account.test.mjs && node tests/naver.test.mjs && node tests/naver-auth.test.mjs && node tests/server.test.mjs && node tests/outage.test.mjs"
+    "test": "node tests/mysql-store.test.mjs && node tests/account.test.mjs && node tests/naver.test.mjs && node tests/naver-auth.test.mjs && node tests/naver-diagnostics.test.mjs && node tests/server.test.mjs && node tests/outage.test.mjs"
   },
   "engines": {
     "node": ">=22"

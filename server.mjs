@@ -1,3 +1,4 @@
+import {inspectNaverTransport} from './naver-diagnostics.mjs';
 import {credentialVault,normalizeConnection,withNaver,listNaver,readNaver,safeMailError} from './naver-mail.mjs';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
@@ -41,11 +42,12 @@ export const server=http.createServer(async(req,res)=>{res.setHeader('X-Content-
  if(path==='/api/naver/connection'&&req.method==='DELETE'){if(mailBusy.has(owner))return json(res,409,{error:'메일 조회가 끝난 뒤 연결을 해제하세요.'});await store.deleteMailConnection(owner);return json(res,200,{ok:true})}
  if(mailBusy.has(owner))return json(res,429,{error:'메일 조회가 진행 중입니다. 잠시 기다려 주세요.'});mailBusy.add(owner);try{
  if(path==='/api/naver/connection'&&req.method==='POST'){if(Date.now()-(mailLastConnect.get(owner)||0)<5000)return json(res,429,{error:'잠시 후 다시 연결하세요.'});mailLastConnect.set(owner,Date.now());const v=await body(req);const credentials=normalizeConnection(v.email,v.appPassword);await withNaver(credentials,async()=>true);await store.saveMailConnection(owner,credentials.email,mailVault.seal(owner,credentials));return json(res,200,{connected:true,email:credentials.email})}
+ if(path==='/api/naver/diagnostics'&&req.method==='GET')return json(res,200,await inspectNaverTransport());
  const config=await store.mailConnection(owner);if(!config)return json(res,409,{error:'먼저 네이버 메일을 연결하세요.'});const credentials=mailVault.open(owner,config.encrypted_secret);
  if(path==='/api/naver/messages'&&req.method==='GET')return json(res,200,{...await withNaver(credentials,listNaver),fetchedAt:new Date().toISOString()});
  if(path==='/api/naver/message'&&req.method==='GET')return json(res,200,await withNaver(credentials,c=>readNaver(c,Number(url.searchParams.get('uid')),url.searchParams.get('validity'))));
  return json(res,404,{error:'없는 메일 API입니다.'});
- }catch(error){const safe=safeMailError(error);console.warn('Naver mail failure:',safe.diagnosticCode,'attempts:',Number(error.authAttempts)||0);return json(res,safe.status,{error:safe.message,code:safe.diagnosticCode})}finally{mailBusy.delete(owner)}}
+ }catch(error){const safe=safeMailError(error);console.warn('Naver mail failure:',safe.diagnosticCode,'attempts:',Number(error.authAttempts)||0,'details:',JSON.stringify(error.authDiagnostics||[]));return json(res,safe.status,{error:safe.message,code:safe.diagnosticCode,details:error.authDiagnostics||[]})}finally{mailBusy.delete(owner)}}
  if(path==='/api/state'&&!await ensureStore())return json(res,503,{error:'MySQL 연결을 확인할 수 없습니다. 이 기기의 변경 사항을 백업하세요.'});
  if(path==='/api/state'&&req.method==='GET'){return json(res,200,await store.read(session(req)))}
  if(path==='/api/state'&&req.method==='PUT'){const v=await body(req);if(!Number.isInteger(v.revision)||v.revision<0)return json(res,400,{error:'저장 데이터 형식 오류'});try{v.state=validateBackup(v.state)}catch{return json(res,400,{error:'저장 데이터 형식 오류'})}const saved=await store.save(v.state,v.revision,session(req));if(!saved)return json(res,409,{error:'다른 기기에서 수정했습니다. 현재 기록을 백업한 뒤 서버 기록을 다시 불러오세요.'});return json(res,200,saved)}
