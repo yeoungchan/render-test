@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const html=fs.readFileSync('dist/index.html','utf8');
+const nodes=new Map();const el=()=>({disabled:false,textContent:'',children:[],replaceChildren(){this.children=[]},append(...items){this.children.push(...items)}});
+const $=id=>{if(!nodes.has(id))nodes.set(id,el());return nodes.get(id)};
+let resolve,reject,calls=0;const context=vm.createContext({$,document:{querySelectorAll:()=>[],createElement:el},encodeURIComponent,requestCloud:()=>{calls++;return new Promise((a,b)=>{resolve=a;reject=b})}});
+vm.runInContext(html.match(/var naverReading=false;[\s\S]*?var naverSelected=.*?;/)[0]+'\n'+html.match(/async function showNaverMessage\(uid\).*\n/)[0],context);
+const first=context.showNaverMessage(1);await context.showNaverMessage(2);assert.equal(calls,1);resolve({subject:'test',from:'sender',text:'body'});await first;assert.equal($('naverInclude').disabled,false);assert.equal(context.naverCurrent.subject,'test');assert.equal(context.naverReading,false);
+const failed=context.showNaverMessage(3);reject(Error('busy'));await failed;assert.equal(context.naverReading,false);assert.equal($('naverInclude').disabled,true);assert.equal($('naverDetail').children.at(-1).textContent,'이 메일 다시 불러오기');
+console.log('PASS rapid selection keeps first result, releases controls, and offers retry on failure');
