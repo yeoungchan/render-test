@@ -1,3 +1,4 @@
+import {createSheets,sheetAccess,SHEET_URL} from './complaint-sheets.mjs';
 import {inspectNaverTransport} from './naver-diagnostics.mjs';
 import {credentialVault,normalizeConnection,withNaver,listNaver,readNaver,safeMailError} from './naver-mail.mjs';
 import http from 'node:http';
@@ -18,6 +19,7 @@ if(production&&!enabled)throw Error('DATABASE_URL is required for production clo
 let store=null,storeLoading=null,retryAfter=0;
 async function ensureStore(){if(store)return store;if(storeLoading)return storeLoading;if(Date.now()<retryAfter)return null;storeLoading=createStore(databaseUrl,existingUsers?null:email).then(value=>{store=value;return value}).catch(error=>{retryAfter=Date.now()+30000;console.error('MySQL connection unavailable:',error.code||'connection_error');return null}).finally(()=>{storeLoading=null});return storeLoading;}
 const passwordHash=scryptSync(password,secret,64);const attempts=new Map();
+const complaintSheets=createSheets();
 const mailBusy=new Set();const mailLastConnect=new Map();const mailVault=credentialVault(process.env.NAVER_CREDENTIAL_KEY||secret);
 function sign(value){return createHmac('sha256',secret).update(value).digest('base64url')}
 function session(req){const token=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('morning_session='))?.slice(16);if(!token)return false;const [data,sig]=token.split('.');if(!data||!sig||sig.length!==sign(data).length||!timingSafeEqual(Buffer.from(sig),Buffer.from(sign(data))))return false;try{const v=JSON.parse(Buffer.from(data,'base64url'));return typeof v.email==='string'&&(existingUsers||v.email===email)&&v.exp>Date.now()?v.email:false}catch{return false}}
@@ -37,6 +39,7 @@ export const server=http.createServer(async(req,res)=>{res.setHeader('X-Content-
  const v=await body(req);const correct=!existingUsers&&typeof v.password==='string'&&v.password.length<=512&&timingSafeEqual(scryptSync(v.password,secret,64),passwordHash);const loginOwner=existingUsers?await store.authenticate(v.email,v.password):(correct&&typeof v.email==='string'&&v.email.trim().toLowerCase()===email?email:null);if(!loginOwner)return json(res,401,{error:'이메일 또는 비밀번호를 확인하세요.'});attempts.delete(ip);const data=Buffer.from(JSON.stringify({email:loginOwner,exp:now+604800000})).toString('base64url');return json(res,200,{ok:true},{'Set-Cookie':cookie(data+'.'+sign(data))})}
  if(path==='/api/logout'&&req.method==='POST')return json(res,200,{ok:true},{'Set-Cookie':cookie('',0)});
  if(!session(req))return json(res,401,{error:'로그인이 필요합니다.'});
+ if(path.startsWith('/api/complaints/')){const owner=session(req);const configured=sheetAccess(owner);if(path==='/api/complaints/status'&&req.method==='GET')return json(res,200,{configured,url:SHEET_URL});if(!configured)return json(res,409,{error:'Google 시트 연결 설정이 아직 완료되지 않았습니다. 관리자에게 Google 서비스 계정 연결을 요청하세요.'});if(!await ensureStore())return json(res,503,{error:'저장소 연결 실패'});try{if(path==='/api/complaints/check'&&req.method==='GET'){await complaintSheets.inspect();return json(res,200,{ok:true,url:SHEET_URL})}if(path==='/api/complaints/import'&&req.method==='POST'){const v=await body(req);const result=await store.withComplaintLock(()=>complaintSheets.write(v.rows));return json(res,200,result)}}catch(error){const status=error.response?.status;if(status) return json(res,502,{error:'Google 시트 접근에 실패했습니다. 서비스 계정의 편집 권한과 Sheets API 활성화를 확인하세요.'});return json(res,error.status||400,{error:error.status?error.message:'Google 연결 또는 시트 양식을 확인하세요. 등록에 실패했습니다.'})}return json(res,404,{error:'없는 민원 API입니다.'})}
  if(path.startsWith('/api/naver/')){const owner=session(req);if(!await ensureStore())return json(res,503,{error:'서버 저장소에 연결할 수 없습니다.'});
  if(path==='/api/naver/connection'&&req.method==='GET'){const config=await store.mailConnection(owner);return json(res,200,{connected:!!config,email:config?.email})}
  if(path==='/api/naver/connection'&&req.method==='DELETE'){if(mailBusy.has(owner))return json(res,409,{error:'메일 조회가 끝난 뒤 연결을 해제하세요.'});await store.deleteMailConnection(owner);return json(res,200,{ok:true})}

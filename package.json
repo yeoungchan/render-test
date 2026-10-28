@@ -6,13 +6,15 @@
   "scripts": {
     "start": "node server.mjs",
     "check": "node --check server.mjs",
-    "test": "node tests/mysql-store.test.mjs && node tests/account.test.mjs && node tests/naver.test.mjs && node tests/naver-auth.test.mjs && node tests/naver-diagnostics.test.mjs && node tests/server.test.mjs && node tests/outage.test.mjs"
+    "test": "node tests/mysql-store.test.mjs && node tests/account.test.mjs && node tests/naver.test.mjs && node tests/naver-auth.test.mjs && node tests/naver-diagnostics.test.mjs && node tests/server.test.mjs && node tests/outage.test.mjs && node tests/naver-ui.test.mjs && node tests/complaints.test.mjs"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "google-auth-library": "^10.9.1",
+    "htmlparser2": "^10.1.0",
     "imapflow": "^2.9.1",
     "mailparser": "^3.12.4",
     "mysql2": "^3.24.6"

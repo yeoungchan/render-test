@@ -32,6 +32,7 @@ if(owner!==null)await pool.execute('INSERT INTO morning_state(owner) VALUES (?) 
  async mailConnection(owner){const [rows]=await pool.execute('SELECT email, encrypted_secret FROM morning_naver_connections WHERE owner = ?',[owner]);return rows[0]||null},
  async saveMailConnection(owner,email,encrypted){await pool.execute('INSERT INTO morning_naver_connections(owner,email,encrypted_secret) VALUES (?,?,?) ON DUPLICATE KEY UPDATE email = ?, encrypted_secret = ?, updated_at = CURRENT_TIMESTAMP(3)',[owner,email,encrypted,email,encrypted])},
  async deleteMailConnection(owner){await pool.execute('DELETE FROM morning_naver_connections WHERE owner = ?',[owner])},
+ async withComplaintLock(operation){const conn=await pool.getConnection();try{const [rows]=await conn.execute('SELECT GET_LOCK(?, 0) AS acquired',['morning_complaint_sheet']);if(Number(rows[0]?.acquired)!==1)throw Object.assign(Error('다른 등록이 진행 중입니다. 잠시 후 다시 시도하세요.'),{status:409});try{return await operation()}finally{await conn.execute('SELECT RELEASE_LOCK(?)',['morning_complaint_sheet'])}}finally{conn.release()}},
  close:()=>pool.end()
  };
 }
