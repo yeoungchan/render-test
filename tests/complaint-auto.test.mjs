@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {createAuto,automaticRows} from '../complaint-auto.mjs';
+import {readFileSync} from 'node:fs';
+const row=['2026-10-28','카드','이O라','2026-09-22','899000','00123','1234','취소','기타','상점','123','','접수','',''];
+const msg={text:'민원 접수',complaints:{rows:[row],warnings:['원문 회신기한: 10/30 — 연도를 포함해 직접 확인·입력하세요.']}};
+assert.equal(automaticRows(msg)[0][11],'');assert.match(automaticRows(msg)[0][14],/10\/30/);
+assert.throws(()=>automaticRows({...msg,truncated:true}));assert.throws(()=>automaticRows({...msg,complaints:{rows:[],warnings:[]}}));assert.equal(automaticRows({...msg,text:'일반 안내'}),null);
+let saved=null,next=11,validity='1',mails=[],written=new Set(),fail=false,writes=0;
+const store={autoRead:async()=>structuredClone(saved),autoSave:async(o,s)=>{saved=structuredClone(s)},withComplaintLock:async f=>f()};
+const deps={getStore:async()=>store,credentials:async()=>({email:'test@naver.com'}),owner:'owner',busy:new Set(),connect:async(a,f)=>f({mailbox:{uidValidity:validity,uidNext:next},async *fetch(){for(const m of mails)yield m}}),read:async(c,uid)=>uid===13?{...msg,truncated:true}:msg,sheets:{inspect:async()=>{},write:async rows=>{writes++;if(fail)throw Error('network');const exists=written.has('key');written.add('key');return {added:exists?0:rows.length,duplicates:exists?rows.length:0}}}};
+let auto=createAuto(deps);await auto.configure(true);assert.equal(saved.cursor,10);await auto.run();assert.equal(writes,0);
+next=13;mails=[{uid:11,envelope:{from:[{address:'other@example.com'}]}},{uid:12,envelope:{from:[{address:'kjy@ksnet.co.kr'}]}}];fail=true;await auto.run();assert.equal(saved.cursor,11);assert.ok(saved.error);
+fail=false;auto=createAuto(deps);await auto.run();assert.equal(saved.cursor,12);assert.equal(saved.total,1);assert.equal(saved.logs[0].status,'등록 완료 · 회신기한 확인 필요');
+next=14;mails=[{uid:13,envelope:{from:[{address:'kjy@ksnet.co.kr'}]}}];await auto.run();assert.equal(saved.cursor,13);assert.equal(saved.logs[0].status,'확인 필요');
+await auto.configure(false);next=15;await auto.run();assert.equal(saved.cursor,13);await auto.configure(true);assert.equal(saved.cursor,13);
+validity='2';await auto.run();assert.equal(saved.enabled,false);assert.match(saved.error,/메일함 번호/);
+const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');let code='';for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)){if(match[1].includes('application/json'))JSON.parse(match[2]);else {new Function(match[2]);code+=match[2]}}assert.ok(code.includes('function loadAutomation'));assert.ok(code.includes('function clearComplaints'));
+console.log('PASS automation baseline, filtering, deadline uncertainty, partial failure checkpoint, restart recovery, review queue, pause/resume, mailbox reset and executable UI');
