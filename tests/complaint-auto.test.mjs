@@ -11,7 +11,7 @@ const deps={getStore:async()=>store,credentials:async()=>({email:'test@naver.com
 let auto=createAuto(deps);await auto.configure(true);assert.equal(saved.cursor,10);await auto.run();assert.equal(writes,0);
 next=13;mails=[{uid:11,envelope:{from:[{address:'other@example.com'}]}},{uid:12,envelope:{from:[{address:'kjy@ksnet.co.kr'}]}}];fail=true;await auto.run();assert.equal(saved.cursor,11);assert.ok(saved.error);
 fail=false;auto=createAuto(deps);await auto.run();assert.equal(saved.cursor,12);assert.equal(saved.total,1);assert.equal(saved.logs[0].status,'등록 완료 · 회신기한 확인 필요');
-next=14;mails=[{uid:13,envelope:{from:[{address:'kjy@ksnet.co.kr'}]}}];await auto.run();assert.equal(saved.cursor,13);assert.equal(saved.logs[0].status,'확인 필요');
+next=14;mails=[{uid:13,envelope:{from:[{address:'JMH4147@ksnet.co.kr'}]}}];await auto.run();assert.equal(saved.cursor,13);assert.equal(saved.logs[0].status,'확인 필요');
 await auto.configure(false);next=15;await auto.run();assert.equal(saved.cursor,13);await auto.configure(true);assert.equal(saved.cursor,13);
 validity='2';await auto.run();assert.equal(saved.enabled,false);assert.match(saved.error,/메일함 번호/);
 const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');let code='';for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)){if(match[1].includes('application/json'))JSON.parse(match[2]);else {new Function(match[2]);code+=match[2]}}assert.ok(code.includes('function loadAutomation'));assert.ok(code.includes('function clearComplaints'));
