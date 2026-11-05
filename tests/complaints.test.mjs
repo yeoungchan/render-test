@@ -18,3 +18,10 @@ assert.equal((await sheets.write(result.rows)).added,1);
 assert.equal((await sheets.write(result.rows)).duplicates,1);
 assert.equal(writes,1);assert.equal(stored[0][5],'00780479');
 console.log('PASS atomic typed write request and retry deduplication from saved sheet keys (API double)');
+// Alternate KSNET form supplied by user; synthetic identifying values.
+const altHeaders=['접수일자','카드 사명','상점 명','상점아이디','민원인(주문자)','카드번호','승인일자','금액','내용','거래번호','승인번호','처리결과','최종 하위몰 명'];
+const altValues=['20261105','농협','테스트상점','2002308352','','MASKED-CARD','20260703','800,000','현금융통 (적발)','196830092927','00159848','',''];
+const altHtml='<table><tr>'+altHeaders.map(v=>'<th>'+v+'</th>').join('')+'</tr><tr>'+altValues.map(v=>'<td>'+v+'</td>').join('')+'</tr></table>';
+const alt=extractComplaints(altHtml,'불법매출 관련 자료 요청\n(11/10 오후 2시까지) 회신하여 주시기 바랍니다.\n회신내용: 하위 가맹점명, 대표자명\n불법매출 건의 매출취소');
+assert.equal(alt.rows.length,1);assert.equal(alt.rows[0][1],'농협');assert.equal(alt.rows[0][2],'');assert.equal(alt.rows[0][7],'현금융통 (적발)');assert.equal(alt.rows[0][10],'2002308352');assert.match(alt.rows[0][14],/대표자명/);assert.match(alt.warnings.join(' '),/11\/10 오후 2시까지/);assert.ok(!JSON.stringify(alt).includes('MASKED-CARD'));assert.equal(prepareRows(alt.rows)[0].values[5].stringValue,'00159848');
+console.log('PASS alternate columns, missing name, source content, request notes, masked-card exclusion and uncertain deadline');
