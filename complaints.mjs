@@ -7,7 +7,7 @@ const norm=s=>String(s).replace(/\s/g,'');
 function descendants(n,name){return (n.children||[]).flatMap(c=>[...(c.name===name?[c]:[]),...descendants(c,name)])}
 export function extractComplaints(html,plain=''){
  const doc=parseDocument(typeof html==='string'?html.slice(0,262144):'');const records=[],warnings=[];
- const source=plain||text(doc);const illegal=/불법\s*매출/.test(source);
+ const source=plain||text(doc);const illegal=/불법\s*매출|불량\s*매출/.test(source);const salesLabel=/불법\s*매출/.test(source)?'불법매출':'불량매출';
  const aliases=[['접수일자'],['카드사','카드사명'],['민원인(주문자)'],['승인일자'],['금액'],['승인번호'],['거래번호'],['민원사유','내용'],['유형'],['상점명'],['상점ID','상점아이디']];
  const extras=['처리결과','최종하위몰명','대표자명','서비스내용','하위몰입점일자','사업자번호','최종하위몰조치내용','제재일자','취소일자'];
  for(const table of descendants(doc,'table')){
@@ -18,7 +18,7 @@ export function extractComplaints(html,plain=''){
  if(!map||!values.some(Boolean))continue;
  if(cells.some(c=>Number(c.attribs?.rowspan||1)>1||Number(c.attribs?.colspan||1)>1)||map.some(i=>i>=cells.length)){warnings.push('병합 셀이 있는 행은 자동 추출하지 않았습니다. 원문을 확인하세요.');continue}
  const row=[...map.map(i=>i<0?'':values[i]),'','접수','',''];
- if(illegal){if(!row[8])row[8]='불법매출 관련 자료·취소 요청';const notes=['메일 분류: 불법매출 관련 요청'];for(const label of extras){const i=labels.indexOf(label);if(i>=0&&values[i])notes.push(label+': '+values[i])}const requests=source.split(/\n/).map(x=>x.trim()).filter(x=>/회신내용|관리.*결과.*회신|매출취소/.test(x));row[14]=[...notes,...requests.slice(0,5)].join(' / ').slice(0,3500)}
+ if(illegal){if(!row[8])row[8]=salesLabel+' 관련 자료·취소 요청';const notes=['메일 분류: '+salesLabel+' 관련 요청'];for(const label of extras){const i=labels.indexOf(label);if(i>=0&&values[i])notes.push(label+': '+values[i])}const requests=source.split(/\n/).map(x=>x.trim()).filter(x=>/회신내용|관리.*결과.*회신|매출취소/.test(x));row[14]=[...notes,...requests.slice(0,5)].join(' / ').slice(0,3500)}
  for(const i of [0,3])if(/^\d{8}$/.test(row[i]))row[i]=row[i].replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');records.push(row);if(records.length>=100)break;}if(records.length>=100)break;}
  const deadline=source.match(/(?:회신기한|회신기간)\s*[:：]?\s*([^\n]{1,60})/)||source.match(/(\d{1,2}\/\d{1,2}[^\n]{0,35}까지)/);
  if(!records.length)warnings.push('본문에서 일치하는 표를 찾지 못했습니다. 이미지·첨부파일 표는 아직 지원하지 않습니다.');

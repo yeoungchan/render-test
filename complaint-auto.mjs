@@ -1,8 +1,8 @@
 import {prepareRows} from './complaints.mjs';
-export const AUTO_SENDERS=['kjy@ksnet.co.kr','jmh4147@ksnet.co.kr'];
+export const AUTO_SENDERS=['kjy@ksnet.co.kr','jmh4147@ksnet.co.kr','rang0505@ksnet.co.kr'];
 export function automaticRows(message){
  if(message.truncated)throw Error('큰 메일은 원문 확인이 필요합니다.');
- if(!/민원|불법\s*매출/.test((message.subject||'')+' '+(message.text||'')))return null;
+ if(!/민원|불법\s*매출|불량\s*매출/.test((message.subject||'')+' '+(message.text||'')))return null;
  const result=message.complaints;
  if(!result?.rows?.length||result.rows.length>=100||(result.warnings||[]).some(w=>!w.startsWith('원문 회신기한:')))throw Error('표가 없거나 불완전합니다. 원문을 확인하세요.');
  const rows=result.rows.map(r=>[...r]);prepareRows(rows);
