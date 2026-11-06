@@ -1,5 +1,5 @@
 import {prepareRows} from './complaints.mjs';
-export const AUTO_SENDERS=['kjy@ksnet.co.kr','jmh4147@ksnet.co.kr','rang0505@ksnet.co.kr'];
+export const AUTO_SENDERS=['kjy@ksnet.co.kr','jmh4147@ksnet.co.kr','rang0505@ksnet.co.kr','tls5555@ksnet.co.kr'];
 export function automaticRows(message){
  if(message.truncated)throw Error('큰 메일은 원문 확인이 필요합니다.');
  if(!/민원|불법\s*매출|불량\s*매출/.test((message.subject||'')+' '+(message.text||'')))return null;
