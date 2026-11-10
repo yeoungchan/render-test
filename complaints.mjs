@@ -16,7 +16,7 @@ export function extractComplaints(html,plain=''){
  const candidate=aliases.map(names=>values.findIndex(v=>names.includes(norm(v))));
  if([0,1,3,4,5,6,7,9,10].every(i=>candidate[i]>=0)&&(candidate[8]>=0||illegal)){map=candidate;labels=values.map(norm);continue}
  if(!map||!values.some(Boolean))continue;
- if(cells.some(c=>Number(c.attribs?.rowspan||1)>1||Number(c.attribs?.colspan||1)>1)||map.some(i=>i>=cells.length)){warnings.push('병합 셀이 있는 행은 자동 추출하지 않았습니다. 원문을 확인하세요.');continue}
+ if(cells.some(c=>Number(c.attribs?.rowspan||1)>1||Number(c.attribs?.colspan||1)>1)){warnings.push('병합 셀이 있는 행은 자동 추출하지 않았습니다. 원문을 확인하세요.');continue}if(map.some(i=>i>=cells.length)){warnings.push('열이 부족한 불완전한 행은 제외했습니다. 원문을 확인하세요.');continue}
  const row=[...map.map(i=>i<0?'':values[i]),'','접수','',''];
  if(illegal){if(!row[8])row[8]=salesLabel+' 관련 자료·취소 요청';const notes=['메일 분류: '+salesLabel+' 관련 요청'];for(const label of extras){const i=labels.indexOf(label);if(i>=0&&values[i])notes.push(label+': '+values[i])}const requests=source.split(/\n/).map(x=>x.trim()).filter(x=>/회신내용|관리.*결과.*회신|매출취소/.test(x));row[14]=[...notes,...requests.slice(0,5)].join(' / ').slice(0,3500)}
  for(const i of [0,3])if(/^\d{8}$/.test(row[i]))row[i]=row[i].replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');records.push(row);if(records.length>=100)break;}if(records.length>=100)break;}
