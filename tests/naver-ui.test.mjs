@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-const html=fs.readFileSync('dist/index.html','utf8');
+const html=fs.readFileSync('dist/index.html','utf8').replace(/\r\n/g,'\n');
 const nodes=new Map();const el=()=>({disabled:false,textContent:'',children:[],replaceChildren(){this.children=[]},append(...items){this.children.push(...items)}});
 const $=id=>{if(!nodes.has(id))nodes.set(id,el());return nodes.get(id)};
 let resolve,reject,calls=0;const context=vm.createContext({$,clearComplaints:()=>{},renderComplaints:()=>{},document:{querySelectorAll:()=>[],createElement:el},encodeURIComponent,requestCloud:()=>{calls++;return new Promise((a,b)=>{resolve=a;reject=b})}});

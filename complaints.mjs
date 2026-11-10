@@ -6,7 +6,7 @@ const text=n=>n.type==='text'?n.data:['script','style'].includes(n.name)?'':(n.c
 const norm=s=>String(s).replace(/\s/g,'');
 function descendants(n,name){return (n.children||[]).flatMap(c=>[...(c.name===name?[c]:[]),...descendants(c,name)])}
 export function extractComplaints(html,plain=''){
- const doc=parseDocument(typeof html==='string'?html.slice(0,262144):'');const records=[],warnings=[];
+ const doc=parseDocument(typeof html==='string'?html.slice(0,2097152):'');const records=[],warnings=[];if(typeof html==='string'&&html.length>2097152)warnings.push('메일 본문 크기 제한을 초과했습니다. 원문을 확인하세요.');
  const source=plain||text(doc);const illegal=/불법\s*매출|불량\s*매출/.test(source);const salesLabel=/불법\s*매출/.test(source)?'불법매출':'불량매출';
  const aliases=[['접수일자'],['카드사','카드사명'],['민원인(주문자)'],['승인일자'],['금액'],['승인번호'],['거래번호'],['민원사유','내용'],['유형'],['상점명'],['상점ID','상점아이디']];
  const extras=['처리결과','최종하위몰명','대표자명','서비스내용','하위몰입점일자','사업자번호','최종하위몰조치내용','제재일자','취소일자'];
